@@ -26,8 +26,21 @@
 
 #import "OADataFetcher.h"
 
+@interface OADataFetcher(){
+@private
+    OAMutableURLRequest *request;
+    NSURLResponse *response;
+    NSURLConnection *connection;
+    NSMutableData *responseData;
+}
+@property (nonatomic, copy) OADataFetcherCompletionBlock completionBlock;
+@property (nonatomic, retain) OAMutableURLRequest *request;
+@end
+
 
 @implementation OADataFetcher
+
+@synthesize completionBlock, request;
 
 - (id)init {
 	if ((self = [super init])) {
@@ -56,9 +69,31 @@
 															  response:response
 																  data:responseData
 															didSucceed:NO];
-
-	[delegate performSelector:didFailSelector withObject:ticket withObject:error];
+    self.completionBlock(ticket, nil, error);
+    self.completionBlock = nil;
 	[ticket release];
+}
+
+- (void)connection:(NSURLConnection *)connection willSendRequestForAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge{
+    SecTrustRef trustRef = challenge.protectionSpace.serverTrust;
+    NSURLCredential *credential = [NSURLCredential credentialForTrust:trustRef];
+    [challenge.sender useCredential:credential forAuthenticationChallenge:challenge];
+}
+
+- (void)connection:(NSURLConnection *)connection didCancelAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge{
+    
+}
+
+- (BOOL)connection:(NSURLConnection *)connection canAuthenticateAgainstProtectionSpace:(NSURLProtectionSpace *)protectionSpace{
+    return YES;
+}
+
+- (BOOL)connectionShouldUseCredentialStorage:(NSURLConnection *)connection{
+    return YES;
+}
+
+- (void)connection:(NSURLConnection *)connection didReceiveAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge{
+    
 }
 
 - (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data {
@@ -71,20 +106,19 @@
 																  data:responseData
 															didSucceed:[(NSHTTPURLResponse *)response statusCode] < 400];
 
-	[delegate performSelector:didFinishSelector withObject:ticket withObject:responseData];
+    self.completionBlock(ticket, [[responseData copy] autorelease], nil);
+    self.completionBlock = nil;
 	[ticket release];
 }
 
-- (void)fetchDataWithRequest:(OAMutableURLRequest *)aRequest delegate:(id)aDelegate didFinishSelector:(SEL)finishSelector didFailSelector:(SEL)failSelector {
-	[request release];
-	request = [aRequest retain];
-    delegate = aDelegate;
-    didFinishSelector = finishSelector;
-    didFailSelector = failSelector;
-    
-    [request prepare];
 
-	connection = [[NSURLConnection alloc] initWithRequest:aRequest delegate:self];
+- (void)fetchDataWithRequest:(OAMutableURLRequest *)aRequest completionBlock:(OADataFetcherCompletionBlock)block{
+    self.completionBlock = block;
+    self.request = aRequest;
+    [[self request] prepare];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        connection = [[NSURLConnection alloc] initWithRequest:aRequest delegate:self];
+    });
 }
 
 @end

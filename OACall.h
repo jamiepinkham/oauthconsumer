@@ -9,38 +9,19 @@
 #import <Foundation/Foundation.h>
 
 @class OAProblem;
-@class OACall;
 
-@protocol OACallDelegate
-
-- (void)call:(OACall *)call failedWithError:(NSError *)error;
-- (void)call:(OACall *)call failedWithProblem:(OAProblem *)problem;
-
-@end
+typedef void (^OACallCompletionBlock)(NSString *responseString, NSError *error, OAProblem *problem);
 
 @class OAConsumer;
 @class OAToken;
-@class OADataFetcher;
-@class OAMutableURLRequest;
-@class OAServiceTicket;
 
-@interface OACall : NSObject {
-	NSURL *url;
-	NSString *method;
-	NSArray *parameters;
-	NSDictionary *files;
-	NSObject <OACallDelegate> *delegate;
-	SEL finishedSelector;
-	OADataFetcher *fetcher;
-	OAMutableURLRequest *request;
-	OAServiceTicket *ticket;
-}
+@interface OACall : NSObject {}
 
 @property(readonly) NSURL *url;
 @property(readonly) NSString *method;
 @property(readonly) NSArray *parameters;
 @property(readonly) NSDictionary *files;
-@property(nonatomic, retain) OAServiceTicket *ticket;
+
 
 - (id)init;
 - (id)initWithURL:(NSURL *)aURL;
@@ -54,10 +35,6 @@
 	   parameters:(NSArray *)theParameters
 			files:(NSDictionary*)theFiles;
 
-- (void)perform:(OAConsumer *)consumer
-		  token:(OAToken *)token
-		  realm:(NSString *)realm
-	   delegate:(NSObject <OACallDelegate> *)aDelegate
-	  didFinish:(SEL)finished;
+- (void)perform:(OAConsumer *)consumer token:(OAToken *)token realm:(NSString *)realm completionBlock:(OACallCompletionBlock)completion;
 
 @end

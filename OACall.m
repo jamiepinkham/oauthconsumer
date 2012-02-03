@@ -14,16 +14,26 @@
 #import "OAMutableURLRequest.h"
 #import "OACall.h"
 
-@interface OACall (Private)
+@interface OACall (){
+	NSURL *url;
+	NSString *method;
+	NSArray *parameters;
+	NSDictionary *files;
+//	OADataFetcher *fetcher;
+//	OAMutableURLRequest *request;
+//	OAServiceTicket *ticket;
+}
 
-- (void)callFinished:(OAServiceTicket *)ticket withData:(NSData *)data;
-- (void)callFailed:(OAServiceTicket *)ticket withError:(NSError *)error;
+/*- (void)callFinished:(OAServiceTicket *)ticket withData:(NSData *)data;
+- (void)callFailed:(OAServiceTicket *)ticket withError:(NSError *)error;*/
+
+@property (nonatomic, copy) OACallCompletionBlock completionBlock;
 
 @end
 
 @implementation OACall
 
-@synthesize url, method, parameters, files, ticket;
+@synthesize url, method, parameters, files, completionBlock;
 
 - (id)init {
 	return [self initWithURL:nil
@@ -75,8 +85,8 @@
 		method = [aMethod retain];
 		parameters = [theParameters retain];
 		files = [theFiles retain];
-		fetcher = nil;
-		request = nil;
+//		fetcher = nil;
+//		request = nil;
 	}
 	
 	return self;
@@ -87,68 +97,98 @@
 	[method release];
 	[parameters release];
 	[files release];
-	[fetcher release];
-	[request release];
-	[ticket release];
+//	[fetcher release];
+//	[request release];
+//	[ticket release];
 	[super dealloc];
 }
 
-- (void)callFailed:(OAServiceTicket *)aTicket withError:(NSError *)error {
-	NSLog(@"error body: %@", aTicket.body);
-	self.ticket = aTicket;
-	[aTicket release];
-	OAProblem *problem = [OAProblem problemWithResponseBody:ticket.body];
-	if (problem) {
-		[delegate call:self failedWithProblem:problem];
-	} else {
-		[delegate call:self failedWithError:error];
-	}
-}
+//- (void)callFailed:(OAServiceTicket *)aTicket withError:(NSError *)error {
+//	NSLog(@"error body: %@", aTicket.body);
+//	self.ticket = aTicket;
+//	[aTicket release];
+//	OAProblem *problem = [OAProblem problemWithResponseBody:ticket.body];
+//	if (problem) {
+//		[delegate call:self failedWithProblem:problem];
+//	} else {
+//		[delegate call:self failedWithError:error];
+//	}
+//}
+//
+//- (void)callFinished:(OAServiceTicket *)aTicket withData:(NSData *)data {
+//	self.ticket = aTicket;
+//	[aTicket release];
+//	if (ticket.didSucceed) {
+////		NSLog(@"Call body: %@", ticket.body);
+//		[delegate performSelector:finishedSelector withObject:self withObject:ticket.body];
+//	} else {
+////		NSLog(@"Failed call body: %@", ticket.body);
+//		[self callFailed:[ticket retain] withError:nil];
+//	}
+//}
 
-- (void)callFinished:(OAServiceTicket *)aTicket withData:(NSData *)data {
-	self.ticket = aTicket;
-	[aTicket release];
-	if (ticket.didSucceed) {
-//		NSLog(@"Call body: %@", ticket.body);
-		[delegate performSelector:finishedSelector withObject:self withObject:ticket.body];
-	} else {
-//		NSLog(@"Failed call body: %@", ticket.body);
-		[self callFailed:[ticket retain] withError:nil];
-	}
-}
+//- (void)perform:(OAConsumer *)consumer
+//		  token:(OAToken *)token
+//		  realm:(NSString *)realm
+//	   delegate:(NSObject <OACallDelegate> *)aDelegate
+//	didFinish:(SEL)finished
+//
+//{
+//	delegate = aDelegate;
+//	finishedSelector = finished;
+//
+//	request = [[OAMutableURLRequest alloc] initWithURL:url
+//											  consumer:consumer
+//												token:token
+//												 realm:realm
+//									 signatureProvider:nil];
+//	if(method) {
+//		[request setHTTPMethod:method];
+//	}
+//
+//	if (self.parameters) {
+//		[request setParameters:self.parameters];
+//	}
+////	if (self.files) {
+////		for (NSString *key in self.files) {
+////			[request attachFileWithName:@"file" filename:NSLocalizedString(@"Photo.jpg", @"") data:[self.files objectForKey:key]];
+////		}
+////	}
+//	fetcher = [[OADataFetcher alloc] init];
+//	[fetcher fetchDataWithRequest:request
+//						 delegate:self
+//				didFinishSelector:@selector(callFinished:withData:)
+//				  didFailSelector:@selector(callFailed:withError:)];
+//}
 
-- (void)perform:(OAConsumer *)consumer
-		  token:(OAToken *)token
-		  realm:(NSString *)realm
-	   delegate:(NSObject <OACallDelegate> *)aDelegate
-	didFinish:(SEL)finished
-
-{
-	delegate = aDelegate;
-	finishedSelector = finished;
-
-	request = [[OAMutableURLRequest alloc] initWithURL:url
+- (void)perform:(OAConsumer *)consumer token:(OAToken *)token realm:(NSString *)realm completionBlock:(OACallCompletionBlock)completion{
+//    self.completionBlock = completion;
+    
+    OAMutableURLRequest *request = [[OAMutableURLRequest alloc] initWithURL:url
 											  consumer:consumer
-												token:token
+                                                 token:token
 												 realm:realm
 									 signatureProvider:nil];
 	if(method) {
 		[request setHTTPMethod:method];
 	}
-
+    
 	if (self.parameters) {
 		[request setParameters:self.parameters];
 	}
-//	if (self.files) {
-//		for (NSString *key in self.files) {
-//			[request attachFileWithName:@"file" filename:NSLocalizedString(@"Photo.jpg", @"") data:[self.files objectForKey:key]];
-//		}
-//	}
-	fetcher = [[OADataFetcher alloc] init];
-	[fetcher fetchDataWithRequest:request
-						 delegate:self
-				didFinishSelector:@selector(callFinished:withData:)
-				  didFailSelector:@selector(callFailed:withError:)];
+    
+    OADataFetcher *fetcher = [[OADataFetcher alloc] init];
+    [fetcher fetchDataWithRequest:request completionBlock:^(OAServiceTicket *ticket, NSData *data, NSError *error) {
+        OAProblem *problem = nil;
+        if(error){
+            problem = [OAProblem problemWithResponseBody:ticket.body];
+        }
+        completion(ticket.body, error, problem);
+    }];
+    
+    [request release];
+    [fetcher release];
+    
 }
 
 /*- (BOOL)isEqual:(id)object {
