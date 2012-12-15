@@ -43,10 +43,21 @@
 			token:(OAToken *)aToken
             realm:(NSString *)aRealm
 signatureProvider:(id<OASignatureProviding>)aProvider {
-    if ((self = [super initWithURL:aUrl
-           cachePolicy:NSURLRequestReloadIgnoringCacheData
-	   timeoutInterval:10.0])) {
+	return [self initWithURL:aUrl consumer:aConsumer token:aToken realm:aRealm callback:nil signatureProvider:aProvider];
     
+}
+
+- (id)initWithURL:(NSURL *)aUrl
+		 consumer:(OAConsumer *)aConsumer
+			token:(OAToken *)aToken
+            realm:(NSString *)aRealm
+		 callback:(NSString *)aCallback
+signatureProvider:(id<OASignatureProviding>)aProvider
+{
+	if ((self = [super initWithURL:aUrl
+					   cachePolicy:NSURLRequestReloadIgnoringCacheData
+				   timeoutInterval:10.0])) {
+		
 		consumer = [aConsumer retain];
 		
 		// empty token for Unauthorized Request Token transaction
@@ -61,7 +72,13 @@ signatureProvider:(id<OASignatureProviding>)aProvider {
 		} else {
 			realm = [aRealm copy];
 		}
-		  
+		
+		if (aCallback == nil) {
+			callback = @"";
+		} else {
+			callback = [aCallback copy];
+		}
+		
 		// default to HMAC-SHA1
 		if (aProvider == nil) {
 			signatureProvider = [[OAHMAC_SHA1SignatureProvider alloc] init];
@@ -104,6 +121,12 @@ signatureProvider:(id<OASignatureProviding>)aProvider
     // set OAuth headers
 	NSMutableArray *chunks = [[NSMutableArray alloc] init];
 	[chunks addObject:[NSString stringWithFormat:@"realm=\"%@\"", [realm encodedURLParameterString]]];
+	
+	if ([callback length] > 0)
+    {
+        [chunks addObject:[NSString stringWithFormat:@"oauth_callback=\"%@\"", [callback encodedURLParameterString]]];
+    }
+	
 	[chunks addObject:[NSString stringWithFormat:@"oauth_consumer_key=\"%@\"", [consumer.key encodedURLParameterString]]];
 
 	NSDictionary *tokenParameters = [token parameters];
@@ -125,7 +148,7 @@ signatureProvider:(id<OASignatureProviding>)aProvider
 
 - (void)_generateTimestamp {
 	[timestamp release];
-    timestamp = [[NSString alloc]initWithFormat:@"%d", time(NULL)];
+    timestamp = [[NSString alloc]initWithFormat:@"%ld", time(NULL)];
 }
 
 - (void)_generateNonce {
@@ -183,6 +206,13 @@ static NSInteger normalize(id obj1, id obj2, void *context)
 	parameter = [[OARequestParameter alloc] initWithName:@"oauth_version" value:@"1.0"] ;
     [parameterPairs addObject:[parameter URLEncodedNameValuePair]];
 	[parameter release];
+	
+	if ([callback length] > 0)
+    {
+        parameter = [[OARequestParameter alloc] initWithName:@"oauth_callback" value:callback] ;
+        [parameterPairs addObject:[parameter URLEncodedNameValuePair]];
+        [parameter release];
+    }
 	
 	for(NSString *k in tokenParameters) {
 		[parameterPairs addObject:[[OARequestParameter requestParameter:k value:[tokenParameters objectForKey:k]] URLEncodedNameValuePair]];
